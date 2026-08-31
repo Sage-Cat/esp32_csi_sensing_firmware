@@ -4,6 +4,13 @@
 implementation that emits CSI and bounded health telemetry. Its implementation
 is `software/esp32-csi-sensing-firmware`.
 
+## Architecture
+
+![ESP32 CSI Sensing Firmware architecture](software/esp32-csi-sensing-firmware/docs/architecture-overview.svg)
+
+The rendered overview is generated from the
+[PlantUML source](software/esp32-csi-sensing-firmware/docs/architecture-overview.puml).
+
 The maintained implementation also exposes the bounded
 `cws-firmware-control/1` measurement-rate protocol with correlated
 prepare/apply/query/restore replies and boot/configuration epochs. Host tests

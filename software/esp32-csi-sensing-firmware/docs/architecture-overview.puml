@@ -1,0 +1,68 @@
+@startuml
+!theme plain
+top to bottom direction
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #3D4A5C
+skinparam ArrowThickness 1
+skinparam ArrowFontSize 11
+skinparam component {
+  BackgroundColor #E8F1F8
+  BorderColor #286486
+  FontColor #1F2937
+}
+skinparam rectangle {
+  BackgroundColor #F7F9FC
+  BorderColor #3D4A5C
+  FontColor #1F2937
+}
+skinparam database {
+  BackgroundColor #E8F3E6
+  BorderColor #3F6B3A
+  FontColor #1F2937
+}
+skinparam cloud {
+  BackgroundColor #F2F2F2
+  BorderColor #5B6470
+  FontColor #1F2937
+}
+skinparam note {
+  BackgroundColor #FFF4CE
+  BorderColor #8A6D1D
+  FontColor #1F2937
+}
+
+cloud "Existing WLAN\nAP + IPv4 gateway\nobserved, not configured" as wlan
+
+rectangle "ESP32-S3 / ESP32-C5 sensing node" as esp32 {
+  component "Wi-Fi station +\nprobe session" as wifi
+  component "CSI receive +\nrecord encoder" as csi
+  component "Bounded control state machine\ncws-firmware-control/1" as control
+  component "Profile + health\ntelemetry" as telemetry
+  component "USB Serial/JTAG\nendpoint" as serial
+  database "NVS\nboot_epoch" as nvs
+
+  wifi -down-> csi : received frames + RF metadata
+  wifi -down-> telemetry : association + probe counters
+  control -up-> wifi : probe rate only, 0..50 Hz
+  nvs -right-> control : boot_epoch
+  control -down-> telemetry : boot/config epochs
+  csi -down-> serial : CSI_DATA
+  telemetry -down-> serial : profile + heartbeat
+  serial -up-> control : parsed requests
+}
+
+rectangle "Host collector / controller\nexternal to this repository" as host
+
+wlan <-down-> wifi : existing association + probes
+serial <-down-> host : records + replies / control requests
+
+note bottom of host
+  No write path for AP, SSID, BSSID, or channel.
+  Capture storage and scientific decisions stay host-side.
+end note
+@enduml
