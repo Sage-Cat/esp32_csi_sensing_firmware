@@ -1,0 +1,2 @@
+# Low-rate reusable firmware profile.
+CONFIG_CWS_PING_FREQUENCY_HZ=10

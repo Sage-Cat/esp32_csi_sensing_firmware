@@ -1,0 +1,9 @@
+ESP32 CSI Sensing Firmware
+
+The source commentary in
+software/esp32-csi-sensing-firmware/main/app_main.c identifies its router CSI
+acquisition path as following Espressif's esp-csi
+examples/get-started/csi_recv_router example. The same source commentary and
+the firmware README identify that example as Apache-2.0/CC0.
+
+This NOTICE makes no additional copyright, trademark, or attribution claim.

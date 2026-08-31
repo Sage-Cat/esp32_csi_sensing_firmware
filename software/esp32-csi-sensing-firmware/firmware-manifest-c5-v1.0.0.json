@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "firmware_profile": "cooperative-router-csi-c5-v1",
+  "firmware_version": "1.0.0",
+  "esp_idf_version": "v5.5.4",
+  "esp_csi_gain_ctrl_version": "0.1.5",
+  "esp_csi_reference_commit": "8633d67152db2808f141cc1595970aa9cf406045",
+  "target": "esp32c5",
+  "flash_size": "16MB",
+  "main_task_stack_bytes": 8192,
+  "probe_payload_bytes": 512,
+  "initial_ping_rate_hz": 40,
+  "runtime_rate_range_hz": [0, 50],
+  "builds": {
+    "esp32-c5-a": {
+      "sdkconfig": "sdkconfig.c5-a",
+      "preferred_channel": 36,
+      "bootloader_sha256": "13b3f8443fb0242988b2feb148bb5fb6b8e1afcfab79c6c5688971aa369b31bf",
+      "partition_table_sha256": "7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820",
+      "application_sha256": "aa8280903f5477114254821ee0cd2d41bc95dd8082681bdab09741241e6d1624"
+    },
+    "esp32-c5-b": {
+      "sdkconfig": "sdkconfig.c5-b",
+      "preferred_channel": 36,
+      "bootloader_sha256": "81e58943362ae593003474ace3a9bc789edd071ab0c2410cca237337addeb73b",
+      "partition_table_sha256": "7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820",
+      "application_sha256": "51bd910896de8d6d1f1098941314ae0a5dddb5f09b9b8ae21aa871ed71f36229"
+    }
+  },
+  "security_boundary": "Generated sdkconfig and application images contain site credentials and are not publication artifacts."
+}

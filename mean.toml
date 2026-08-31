@@ -1,0 +1,15 @@
+schema_version = 1
+mean_id = "esp32_csi_sensing_firmware"
+canonical_name = "ESP32 CSI Sensing Firmware"
+implementation_surface = "software/esp32-csi-sensing-firmware"
+
+[practical_contract]
+implementation_kind = "software-hardware"
+practical_task = "Acquire associated-source Wi-Fi CSI with bounded health/timing telemetry and execute correlated measurement-rate transactions on an ESP32 node."
+usable_result = "A serial CSI/telemetry stream plus versioned capability, state, and verified measurement-control replies for an external consumer."
+intended_user = "Authorized ESP32 sensing-node operator."
+application_route = "Build and flash with the pinned toolchain, apply site configuration outside Git, and consume the serial protocol."
+inputs = ["Authorized Wi-Fi association", "Versioned node configuration", "Bounded serial commands"]
+outputs = ["CSI records", "Health telemetry", "Configuration epochs", "Correlated prepare/apply/query/restore replies"]
+exclusions = ["Dataset retention, activity inference, network decisions, and scientific claims"]
+verification_routes = ["PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_repository.py"]

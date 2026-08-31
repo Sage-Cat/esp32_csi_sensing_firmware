@@ -1,0 +1,3 @@
+# Copy to sdkconfig.site, keep mode 0600, and do not publish it.
+CONFIG_EXAMPLE_WIFI_SSID="replace-me"
+CONFIG_EXAMPLE_WIFI_PASSWORD="replace-me"

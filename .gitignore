@@ -1,0 +1,47 @@
+.env
+.env.*
+.envrc
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local deployment credentials and identifiers.
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+sdkconfig.site
+sdkconfig.site.*
+!sdkconfig.site.example
+
+# ESP-IDF build products and local run output.
+build*/
+managed_components/
+sdkconfig
+sdkconfig.old
+*.bin
+*.elf
+*.map
+*.log
+*.pcap
+*.pcapng
+*.csi
+*.raw
+captures/
+logs/
+runs/
+raw/
+
+# Private owner data and generated workspace views are never public-release inputs.
+/materials/
+/provenance/
+/experiments/
+/locations/
+/private/
+/mean/experiments.generated.toml
+/evidence/publications.generated.toml

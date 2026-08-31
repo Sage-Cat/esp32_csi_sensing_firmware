@@ -1,0 +1,31 @@
+menu "CWS CSI node"
+
+    config CWS_NODE_LABEL
+        string "Stable logical node label"
+        default "esp32-s3"
+
+    config CWS_PING_FREQUENCY_HZ
+        int "Router ping and nominal CSI sampling frequency"
+        range 1 50
+        default 40
+
+    config CWS_PROBE_PAYLOAD_BYTES
+        int "ICMP measurement payload size in bytes"
+        range 1 1400
+        default 512
+
+    config CWS_HEARTBEAT_INTERVAL_MS
+        int "Timing heartbeat interval in milliseconds"
+        range 500 30000
+        default 5000
+
+    config CWS_PREFERRED_BSSID
+        string "Preferred AP BSSID (empty allows normal SSID selection)"
+        default ""
+
+    config CWS_PREFERRED_CHANNEL
+        int "Preferred AP primary channel (0 allows normal selection)"
+        range 0 177
+        default 0
+
+endmenu

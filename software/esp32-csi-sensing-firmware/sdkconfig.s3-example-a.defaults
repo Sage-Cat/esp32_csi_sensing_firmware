@@ -1,0 +1,2 @@
+# Neutral example identity for an ESP32-S3 device.
+CONFIG_CWS_NODE_LABEL="esp32-s3-example-a"
