@@ -43,11 +43,13 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.2"
+#define CWS_FIRMWARE_VERSION "1.0.3"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.3"
+#define CWS_FIRMWARE_VERSION "1.4.4"
 #endif
+
+#define CWS_COMMAND_TASK_STACK_BYTES 12288
 
 static const char *TAG = "cws_csi_node";
 
@@ -885,9 +887,13 @@ void app_main(void)
      * USB source appear completely silent while example_connect() waits.  The
      * command task starts here as well so a stalled association remains
      * remotely rebootable through the collector-owned serial channel.
-     */
+    */
     xTaskCreate(heartbeat_task, "cws_heartbeat", 4096, NULL, 4, NULL);
-    xTaskCreate(command_task, "cws_command", 4096, NULL, 4, NULL);
+    if (xTaskCreate(command_task, "cws_command", CWS_COMMAND_TASK_STACK_BYTES,
+                    NULL, 4, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "failed to create command task");
+        abort();
+    }
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());

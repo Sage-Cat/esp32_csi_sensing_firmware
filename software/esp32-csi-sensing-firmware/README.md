@@ -80,13 +80,14 @@ Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same USB serial channel. Zero
 stops the generating ping session without disabling Wi-Fi or changing the
 production network. Success emits `CWS_CONFIG_APPLIED ping_hz=20`; invalid or
 failed requests retain the previous rate and emit `CWS_CONFIG_REJECTED`.
-S3 version 1.4.3 and C5 version 1.0.2 keep the command-input task alive when
+S3 version 1.4.4 and C5 version 1.0.3 keep the command-input task alive when
 native USB Serial/JTAG temporarily reports EOF before the collector opens the
 port, so both the legacy command and `cws-firmware-control/1` remain reachable
 after unattended boot. They also use the interrupt-driven USB Serial/JTAG
 driver with dedicated receive/transmit buffers and an explicit LF wire line
 ending, allowing commands and acknowledgements to coexist with sustained CSI
-output.
+output. The command task has a dedicated 12 KiB stack for the nested
+prepare/apply/query/restore path and ping-session reconfiguration.
 `CWS_REBOOT` emits an acknowledgement before a deliberate software reset, which
 provides a reproducible fault injection without touching the board or cable.
 Every heartbeat also reports CSI/probe reinitialization and failure counters,
