@@ -19,6 +19,8 @@
 #include "freertos/task.h"
 
 #include "driver/temperature_sensor.h"
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
 #include "esp_check.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -41,10 +43,10 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.1"
+#define CWS_FIRMWARE_VERSION "1.0.2"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.2"
+#define CWS_FIRMWARE_VERSION "1.4.3"
 #endif
 
 static const char *TAG = "cws_csi_node";
@@ -826,6 +828,20 @@ void app_main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stdin, NULL, _IONBF, 0);
+
+    /*
+     * The default USB Serial/JTAG VFS performs non-blocking reads directly
+     * from the small hardware FIFO.  Install the interrupt-driven driver so
+     * commands arriving while CSI is streaming are buffered and the command
+     * task can block until a complete LF-terminated protocol line arrives.
+     */
+    usb_serial_jtag_driver_config_t usb_serial_config = {
+        .tx_buffer_size = 16384,
+        .rx_buffer_size = 1024,
+    };
+    ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_config));
+    usb_serial_jtag_vfs_use_driver();
+    usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_LF);
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||
