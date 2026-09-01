@@ -43,14 +43,15 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.5"
+#define CWS_FIRMWARE_VERSION "1.0.6"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.6"
+#define CWS_FIRMWARE_VERSION "1.4.7"
 #endif
 
 #define CWS_COMMAND_TASK_STACK_BYTES 12288
 #define CWS_HEARTBEAT_OUTPUT_BYTES 1024
+#define CWS_CSI_OUTPUT_WAIT_MS 10
 
 static const char *TAG = "cws_csi_node";
 
@@ -207,7 +208,15 @@ static void csi_rx_callback(void *ctx, wifi_csi_info_t *info)
         return;
     }
 
-    if (xSemaphoreTake(s_output_lock, 0) != pdTRUE) {
+    /*
+     * A profile, heartbeat, or acknowledged control reply can briefly own the
+     * shared USB writer at the instant a CSI callback arrives.  Waiting for at
+     * most one scheduler tick avoids turning that bounded scheduling overlap
+     * into a missing CSI record while remaining shorter than the 25 ms probe
+     * interval at the supported 40 Hz operating point.
+     */
+    if (xSemaphoreTake(s_output_lock,
+                       pdMS_TO_TICKS(CWS_CSI_OUTPUT_WAIT_MS)) != pdTRUE) {
         portENTER_CRITICAL(&s_state_lock);
         s_output_drop_count++;
         portEXIT_CRITICAL(&s_state_lock);
@@ -267,7 +276,8 @@ static void csi_rx_callback(void *ctx, wifi_csi_info_t *info)
         goto output_overflow;
     }
     used += (size_t)written;
-    if (!output_write_bytes(s_csi_line, used, 0)) {
+    if (!output_write_bytes(s_csi_line, used,
+                            pdMS_TO_TICKS(CWS_CSI_OUTPUT_WAIT_MS))) {
         goto output_overflow;
     }
 

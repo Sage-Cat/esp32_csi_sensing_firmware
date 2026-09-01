@@ -80,7 +80,7 @@ Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same USB serial channel. Zero
 stops the generating ping session without disabling Wi-Fi or changing the
 production network. Success emits `CWS_CONFIG_APPLIED ping_hz=20`; invalid or
 failed requests retain the previous rate and emit `CWS_CONFIG_REJECTED`.
-S3 version 1.4.6 and C5 version 1.0.5 keep the command-input task alive when
+S3 version 1.4.7 and C5 version 1.0.6 keep the command-input task alive when
 native USB Serial/JTAG temporarily reports EOF before the collector opens the
 port, so both the legacy command and `cws-firmware-control/1` remain reachable
 after unattended boot. They also use the interrupt-driven USB Serial/JTAG
@@ -92,7 +92,10 @@ schema, and heartbeat records are formatted before taking the CSI-output mutex
 and emitted through one bulk USB Serial/JTAG driver write. CSI records use the
 same bulk driver path, avoiding the VFS character-at-a-time write adapter and
 preventing telemetry formatting or transmission from holding the mutex across
-the next CSI callback.
+the next CSI callback. A CSI callback may wait at most 10 ms for that shared
+writer and its transmit queue; this remains below the 25 ms probe interval at
+40 Hz and prevents a bounded heartbeat/control overlap from becoming a dropped
+record.
 `CWS_REBOOT` emits an acknowledgement before a deliberate software reset, which
 provides a reproducible fault injection without touching the board or cable.
 Every heartbeat also reports CSI/probe reinitialization and failure counters,
