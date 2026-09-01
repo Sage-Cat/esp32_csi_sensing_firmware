@@ -43,10 +43,10 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.4"
+#define CWS_FIRMWARE_VERSION "1.0.5"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.5"
+#define CWS_FIRMWARE_VERSION "1.4.6"
 #endif
 
 #define CWS_COMMAND_TASK_STACK_BYTES 12288
@@ -87,6 +87,12 @@ static cws_control_context_t s_control_protocol;
 
 static esp_err_t csi_reinitialize(const char *reason);
 static esp_err_t ping_restart_current(const char *reason);
+
+static bool output_write_bytes(const char *data, size_t size,
+                               TickType_t ticks_to_wait)
+{
+    return usb_serial_jtag_write_bytes(data, size, ticks_to_wait) == (int)size;
+}
 
 static void ping_on_success(esp_ping_handle_t handle, void *args)
 {
@@ -261,7 +267,7 @@ static void csi_rx_callback(void *ctx, wifi_csi_info_t *info)
         goto output_overflow;
     }
     used += (size_t)written;
-    if (fwrite(s_csi_line, 1, used, stdout) != used) {
+    if (!output_write_bytes(s_csi_line, used, 0)) {
         goto output_overflow;
     }
 
@@ -591,7 +597,7 @@ static size_t control_describe_state(void *context, char *out, size_t out_size)
 static void control_emit_reply(const char *reply)
 {
     if (xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        fputs(reply, stdout);
+        output_write_bytes(reply, strlen(reply), pdMS_TO_TICKS(1000));
         xSemaphoreGive(s_output_lock);
     }
 }
@@ -709,7 +715,7 @@ static void heartbeat_task(void *arg)
     if (profile_written > 0 &&
         (size_t)profile_written < sizeof(s_heartbeat_output) &&
         xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        fwrite(s_heartbeat_output, 1, (size_t)profile_written, stdout);
+        output_write_bytes(s_heartbeat_output, (size_t)profile_written, 0);
         xSemaphoreGive(s_output_lock);
     }
 
@@ -808,7 +814,7 @@ static void heartbeat_task(void *arg)
         if (heartbeat_written > 0 &&
             (size_t)heartbeat_written < sizeof(s_heartbeat_output) &&
             xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(250)) == pdTRUE) {
-            fwrite(s_heartbeat_output, 1, (size_t)heartbeat_written, stdout);
+            output_write_bytes(s_heartbeat_output, (size_t)heartbeat_written, 0);
             xSemaphoreGive(s_output_lock);
         }
 
