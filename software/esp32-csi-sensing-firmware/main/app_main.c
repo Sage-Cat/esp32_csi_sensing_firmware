@@ -41,10 +41,10 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.0"
+#define CWS_FIRMWARE_VERSION "1.0.1"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.1"
+#define CWS_FIRMWARE_VERSION "1.4.2"
 #endif
 
 static const char *TAG = "cws_csi_node";
@@ -593,7 +593,19 @@ static void control_emit_reply(const char *reply)
 static void command_task(void *arg)
 {
     char line[CWS_CONTROL_MAX_LINE + 2];
-    while (fgets(line, sizeof(line), stdin) != NULL) {
+    while (true) {
+        /*
+         * Native USB Serial/JTAG stdin can report EOF while no host has the
+         * port open.  An unattended sensor normally boots before its
+         * collector, so treating that transient as a terminal condition
+         * permanently disables runtime control.  Clear the stream state and
+         * retry at a bounded rate until a host connects.
+         */
+        if (fgets(line, sizeof(line), stdin) == NULL) {
+            clearerr(stdin);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
         size_t line_size = strlen(line);
         bool overlong = line_size == sizeof(line) - 1 &&
                         line[line_size - 1] != '\n';
@@ -660,8 +672,6 @@ static void command_task(void *arg)
             xSemaphoreGive(s_output_lock);
         }
     }
-    ESP_LOGW(TAG, "serial command input ended");
-    vTaskDelete(NULL);
 }
 
 static void heartbeat_task(void *arg)
