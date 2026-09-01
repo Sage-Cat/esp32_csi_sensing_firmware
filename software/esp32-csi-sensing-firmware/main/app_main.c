@@ -19,8 +19,13 @@
 #include "freertos/task.h"
 
 #include "driver/temperature_sensor.h"
+#if CONFIG_IDF_TARGET_ESP32C5
+#include "driver/uart.h"
+#include "driver/uart_vfs.h"
+#else
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
+#endif
 #include "esp_check.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -43,7 +48,7 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.6"
+#define CWS_FIRMWARE_VERSION "1.0.7"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
 #define CWS_FIRMWARE_VERSION "1.4.7"
@@ -92,7 +97,13 @@ static esp_err_t ping_restart_current(const char *reason);
 static bool output_write_bytes(const char *data, size_t size,
                                TickType_t ticks_to_wait)
 {
+#if CONFIG_IDF_TARGET_ESP32C5
+    (void)ticks_to_wait;
+    return uart_write_bytes((uart_port_t)CONFIG_ESP_CONSOLE_UART_NUM, data,
+                            size) == (int)size;
+#else
     return usb_serial_jtag_write_bytes(data, size, ticks_to_wait) == (int)size;
+#endif
 }
 
 static void ping_on_success(esp_ping_handle_t handle, void *args)
@@ -859,6 +870,16 @@ void app_main(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stdin, NULL, _IONBF, 0);
 
+    /* Use the reliable board transport selected for each target. */
+#if CONFIG_IDF_TARGET_ESP32C5
+    ESP_ERROR_CHECK(uart_driver_install(
+        (uart_port_t)CONFIG_ESP_CONSOLE_UART_NUM, 1024, 16384, 0, NULL, 0));
+    uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
+    uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM,
+                                          ESP_LINE_ENDINGS_LF);
+    uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM,
+                                          ESP_LINE_ENDINGS_LF);
+#else
     /*
      * The default USB Serial/JTAG VFS performs non-blocking reads directly
      * from the small hardware FIFO.  Install the interrupt-driven driver so
@@ -872,6 +893,7 @@ void app_main(void)
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_config));
     usb_serial_jtag_vfs_use_driver();
     usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_LF);
+#endif
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES ||

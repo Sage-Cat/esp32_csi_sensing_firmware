@@ -2,8 +2,10 @@
 
 This ESP-IDF firmware associates with an existing 2.4 GHz Wi-Fi network,
 continuously pings its gateway, and emits AP-to-sensor CSI over the board's
-native USB Serial/JTAG connection. It does not change the AP, channel, SSID, or
-any production-network setting.
+selected wired serial transport. ESP32-S3 uses native USB Serial/JTAG, while
+ESP32-C5 uses the DevKitC USB-to-UART bridge on the `COM` connector. The
+firmware does not change the AP, channel, SSID, or any production-network
+setting.
 
 The CSI path is based on Espressif esp-csi
 examples/get-started/csi_recv_router at commit
@@ -31,9 +33,11 @@ PSRAM. Builds are pinned to ESP-IDF v5.5.4.
 
 The ESP32-C5 variant uses the same failure-aware envelope, persistent boot
 epoch, runtime rate command, and deliberate reboot command. It emits the
-official shorter C5 CSI metadata schema and records AGC/FFT gains. An example
-device-class profile can set a preferred BSSID/channel; an empty preference
-retains normal SSID-based AP selection.
+official shorter C5 CSI metadata schema and records AGC/FFT gains. Version
+1.0.7 uses the interrupt-driven UART0 transport at 921600 baud through the
+DevKitC `COM` connector, avoiding dependence on the board's native USB data
+path. An example device-class profile can set a preferred BSSID/channel; an
+empty preference retains normal SSID-based AP selection.
 
 ## Build
 
@@ -52,7 +56,17 @@ Use `sdkconfig.s3-example-a.defaults` and matching build/config paths for the
 S3 example A profile. A separate build directory and generated sdkconfig for
 each example profile prevent one device label from leaking into another image.
 The C5 example profiles are `sdkconfig.c5-example-a.defaults` and
-`sdkconfig.c5-example-b.defaults`.
+`sdkconfig.c5-example-b.defaults`. C5 builds must also include
+`sdkconfig.c5.defaults` before the site and device defaults so the UART/`COM`
+transport is selected explicitly, for example:
+
+    idf.py -B build-c5-example-a -D SDKCONFIG=sdkconfig.c5-example-a \
+      -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c5.defaults;sdkconfig.site;sdkconfig.c5-example-a.defaults;sdkconfig.rate-40.defaults" \
+      set-target esp32c5
+    idf.py -B build-c5-example-a -D SDKCONFIG=sdkconfig.c5-example-a \
+      -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c5.defaults;sdkconfig.site;sdkconfig.c5-example-a.defaults;sdkconfig.rate-40.defaults" \
+      build
+
 Use `sdkconfig.rate-10.defaults`, `sdkconfig.rate-20.defaults`, or
 `sdkconfig.rate-40.defaults` as the final defaults file for a rate-comparison
 image. The selected rate is emitted in every profile and heartbeat record.
@@ -76,21 +90,22 @@ site Wi-Fi credential is compiled into the firmware.
 An external consumer can wrap each raw line with its own ingest time and
 connection metadata.
 
-Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same USB serial channel. Zero
+Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same serial channel. Zero
 stops the generating ping session without disabling Wi-Fi or changing the
 production network. Success emits `CWS_CONFIG_APPLIED ping_hz=20`; invalid or
 failed requests retain the previous rate and emit `CWS_CONFIG_REJECTED`.
-S3 version 1.4.7 and C5 version 1.0.6 keep the command-input task alive when
-native USB Serial/JTAG temporarily reports EOF before the collector opens the
+S3 version 1.4.7 and C5 version 1.0.7 keep the command-input task alive when
+their serial transport temporarily reports EOF before the collector opens the
 port, so both the legacy command and `cws-firmware-control/1` remain reachable
-after unattended boot. They also use the interrupt-driven USB Serial/JTAG
-driver with dedicated receive/transmit buffers and an explicit LF wire line
+after unattended boot. S3 uses the interrupt-driven USB Serial/JTAG driver;
+C5 uses the interrupt-driven UART0 driver through the DevKitC `COM` bridge.
+Both have dedicated receive/transmit buffers and an explicit LF wire line
 ending, allowing commands and acknowledgements to coexist with sustained CSI
 output. The command task has a dedicated 12 KiB stack for the nested
 prepare/apply/query/restore path and ping-session reconfiguration. Profile,
 schema, and heartbeat records are formatted before taking the CSI-output mutex
-and emitted through one bulk USB Serial/JTAG driver write. CSI records use the
-same bulk driver path, avoiding the VFS character-at-a-time write adapter and
+and emitted through one bulk transport-driver write. CSI records use the same
+bulk driver path, avoiding the VFS character-at-a-time write adapter and
 preventing telemetry formatting or transmission from holding the mutex across
 the next CSI callback. A CSI callback may wait at most 10 ms for that shared
 writer and its transmit queue; this remains below the 25 ms probe interval at
