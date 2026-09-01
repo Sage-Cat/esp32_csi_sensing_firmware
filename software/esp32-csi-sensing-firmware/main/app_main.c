@@ -43,13 +43,14 @@
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.3"
+#define CWS_FIRMWARE_VERSION "1.0.4"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.4"
+#define CWS_FIRMWARE_VERSION "1.4.5"
 #endif
 
 #define CWS_COMMAND_TASK_STACK_BYTES 12288
+#define CWS_HEARTBEAT_OUTPUT_BYTES 1024
 
 static const char *TAG = "cws_csi_node";
 
@@ -58,6 +59,7 @@ static SemaphoreHandle_t s_ping_lock;
 static SemaphoreHandle_t s_csi_control_lock;
 static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
 static char s_csi_line[4096];
+static char s_heartbeat_output[CWS_HEARTBEAT_OUTPUT_BYTES];
 static uint8_t s_ap_bssid[6];
 static uint8_t s_station_mac[6];
 static uint8_t s_ap_channel;
@@ -683,25 +685,31 @@ static void heartbeat_task(void *arg)
     uint8_t station_mac[6];
     ESP_ERROR_CHECK(esp_read_mac(station_mac, ESP_MAC_WIFI_STA));
 
-    if (xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(1000)) == pdTRUE) {
-        printf(
-            "CSI_PROFILE fw_profile=%s fw_version=%s fw_role=live "
-            "node_label=%s boot_epoch=%" PRIu32 " config_epoch=%" PRIu32 " station_mac=" MACSTR
-            " ping_hz=%" PRIu32 " probe_payload_bytes=%d\n",
-            CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION, CONFIG_CWS_NODE_LABEL,
-            s_boot_epoch, s_config_epoch, MAC2STR(station_mac), s_ping_hz,
-            CONFIG_CWS_PROBE_PAYLOAD_BYTES);
 #if CONFIG_IDF_TARGET_ESP32C5
-        printf(
-            "type,seq,mac,rssi,rate,noise_floor,fft_gain,agc_gain,channel,"
-            "local_timestamp,sig_len,rx_format,len,first_word,data\n");
+    const char *csi_header =
+        "type,seq,mac,rssi,rate,noise_floor,fft_gain,agc_gain,channel,"
+        "local_timestamp,sig_len,rx_format,len,first_word,data\n";
 #else
-        printf(
-            "type,id,mac,rssi,rate,sig_mode,mcs,bandwidth,smoothing,"
-            "not_sounding,aggregation,stbc,fec_coding,sgi,noise_floor,"
-            "ampdu_cnt,channel,secondary_channel,local_timestamp,ant,"
-            "sig_len,rx_state,len,first_word,data\n");
+    const char *csi_header =
+        "type,id,mac,rssi,rate,sig_mode,mcs,bandwidth,smoothing,"
+        "not_sounding,aggregation,stbc,fec_coding,sgi,noise_floor,"
+        "ampdu_cnt,channel,secondary_channel,local_timestamp,ant,"
+        "sig_len,rx_state,len,first_word,data\n";
 #endif
+
+    int profile_written = snprintf(
+        s_heartbeat_output, sizeof(s_heartbeat_output),
+        "CSI_PROFILE fw_profile=%s fw_version=%s fw_role=live "
+        "node_label=%s boot_epoch=%" PRIu32 " config_epoch=%" PRIu32
+        " station_mac=" MACSTR " ping_hz=%" PRIu32
+        " probe_payload_bytes=%d\n%s",
+        CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION, CONFIG_CWS_NODE_LABEL,
+        s_boot_epoch, s_config_epoch, MAC2STR(station_mac), s_ping_hz,
+        CONFIG_CWS_PROBE_PAYLOAD_BYTES, csi_header);
+    if (profile_written > 0 &&
+        (size_t)profile_written < sizeof(s_heartbeat_output) &&
+        xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        fwrite(s_heartbeat_output, 1, (size_t)profile_written, stdout);
         xSemaphoreGive(s_output_lock);
     }
 
@@ -765,8 +773,8 @@ static void heartbeat_task(void *arg)
         config_epoch = s_config_epoch;
         portEXIT_CRITICAL(&s_state_lock);
 
-        if (xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(250)) == pdTRUE) {
-            printf(
+        int heartbeat_written = snprintf(
+                s_heartbeat_output, sizeof(s_heartbeat_output),
                 "CWSLAB_TIMING_HEARTBEAT uptime_ms=%" PRIu64
                 " boot_epoch=%" PRIu32 " csi_count=%" PRIu64
                 " config_epoch=%" PRIu32
@@ -797,6 +805,10 @@ static void heartbeat_task(void *arg)
                 ping_success_count, ping_timeout_count,
                 csi_stalled ? 1 : 0,
                 chip_temp_millicelsius);
+        if (heartbeat_written > 0 &&
+            (size_t)heartbeat_written < sizeof(s_heartbeat_output) &&
+            xSemaphoreTake(s_output_lock, pdMS_TO_TICKS(250)) == pdTRUE) {
+            fwrite(s_heartbeat_output, 1, (size_t)heartbeat_written, stdout);
             xSemaphoreGive(s_output_lock);
         }
 
