@@ -45,13 +45,14 @@
 
 #include "cws_control_protocol.h"
 #include "cws_legacy_commands.h"
+#include "cws_probe_timing.h"
 
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
-#define CWS_FIRMWARE_VERSION "1.0.7"
+#define CWS_FIRMWARE_VERSION "1.0.8"
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.7"
+#define CWS_FIRMWARE_VERSION "1.4.8"
 #endif
 
 #define CWS_COMMAND_TASK_STACK_BYTES 12288
@@ -451,7 +452,10 @@ static esp_err_t ping_router_start(uint32_t frequency_hz,
 
     esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
     config.count = 0;
-    config.interval_ms = 1000 / frequency_hz;
+    if (!cws_probe_timing_for_frequency(frequency_hz, &config.interval_ms,
+                                        &config.timeout_ms)) {
+        return ESP_ERR_INVALID_ARG;
+    }
     config.task_stack_size = 3072;
     config.data_size = CONFIG_CWS_PROBE_PAYLOAD_BYTES;
     config.target_addr.u_addr.ip4.addr = ip4_addr_get_u32(&local_ip.gw);
@@ -582,6 +586,7 @@ static size_t control_describe_state(void *context, char *out, size_t out_size)
     uint64_t output_drops;
     uint64_t ping_success;
     uint64_t ping_timeout;
+    uint32_t ping_hz;
     portENTER_CRITICAL(&s_state_lock);
     connected = s_connected;
     channel = s_ap_channel;
@@ -591,6 +596,7 @@ static size_t control_describe_state(void *context, char *out, size_t out_size)
     output_drops = s_output_drop_count;
     ping_success = s_ping_success_count;
     ping_timeout = s_ping_timeout_count;
+    ping_hz = s_ping_hz;
     portEXIT_CRITICAL(&s_state_lock);
     if (connected) {
         return (size_t)snprintf(
@@ -599,20 +605,23 @@ static size_t control_describe_state(void *context, char *out, size_t out_size)
             " rate_max_hz=50 band=%s channel=%u bssid=%02x%02x%02x%02x%02x%02x"
             " csi_accepted=%" PRIu64 " csi_invalid=%" PRIu64
             " output_drops=%" PRIu64 " ping_success=%" PRIu64
-            " ping_timeouts=%" PRIu64,
+            " ping_timeouts=%" PRIu64 " ping_timeout_ms=%" PRIu32,
             CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION, CONFIG_CWS_NODE_LABEL,
             channel <= 14 ? "2g" : "5g", channel, bssid[0], bssid[1], bssid[2],
             bssid[3], bssid[4], bssid[5], csi_accepted, csi_invalid,
-            output_drops, ping_success, ping_timeout);
+            output_drops, ping_success, ping_timeout,
+            cws_probe_timeout_ms(ping_hz));
     }
     return (size_t)snprintf(out, out_size,
                             "firmware_profile=%s firmware_version=%s node_id=%s"
                             " rate_min_hz=0 rate_max_hz=50 csi_accepted=%" PRIu64
                             " csi_invalid=%" PRIu64 " output_drops=%" PRIu64
-                            " ping_success=%" PRIu64 " ping_timeouts=%" PRIu64,
+                            " ping_success=%" PRIu64 " ping_timeouts=%" PRIu64
+                            " ping_timeout_ms=%" PRIu32,
                             CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION,
                             CONFIG_CWS_NODE_LABEL, csi_accepted, csi_invalid,
-                            output_drops, ping_success, ping_timeout);
+                            output_drops, ping_success, ping_timeout,
+                            cws_probe_timeout_ms(ping_hz));
 }
 
 static void control_emit_reply(const char *reply)
@@ -729,9 +738,11 @@ static void heartbeat_task(void *arg)
         "CSI_PROFILE fw_profile=%s fw_version=%s fw_role=live "
         "node_label=%s boot_epoch=%" PRIu32 " config_epoch=%" PRIu32
         " station_mac=" MACSTR " ping_hz=%" PRIu32
+        " ping_timeout_ms=%" PRIu32
         " probe_payload_bytes=%d\n%s",
         CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION, CONFIG_CWS_NODE_LABEL,
         s_boot_epoch, s_config_epoch, MAC2STR(station_mac), s_ping_hz,
+        cws_probe_timeout_ms(s_ping_hz),
         CONFIG_CWS_PROBE_PAYLOAD_BYTES, csi_header);
     if (profile_written > 0 &&
         (size_t)profile_written < sizeof(s_heartbeat_output) &&
@@ -811,7 +822,8 @@ static void heartbeat_task(void *arg)
                 " output_drops=%" PRIu64 " connected=%d channel=%u"
                 " bssid=" MACSTR " station_mac=" MACSTR
                 " node_label=%s fw_profile=%s fw_version=%s"
-                " ping_hz=%" PRIu32 " probe_payload_bytes=%d"
+                " ping_hz=%" PRIu32 " ping_timeout_ms=%" PRIu32
+                " probe_payload_bytes=%d"
                 " csi_reinit_count=%" PRIu32
                 " csi_reinit_failures=%" PRIu32
                 " csi_stall_count=%" PRIu32
@@ -826,7 +838,8 @@ static void heartbeat_task(void *arg)
                 csi_invalid_count, output_drop_count, connected ? 1 : 0, channel,
                 MAC2STR(bssid), MAC2STR(station_mac), CONFIG_CWS_NODE_LABEL,
                 CWS_FIRMWARE_PROFILE, CWS_FIRMWARE_VERSION,
-                ping_hz, CONFIG_CWS_PROBE_PAYLOAD_BYTES,
+                ping_hz, cws_probe_timeout_ms(ping_hz),
+                CONFIG_CWS_PROBE_PAYLOAD_BYTES,
                 csi_reinit_count, csi_reinit_failure_count, csi_stall_count,
                 ping_restart_count, ping_restart_failure_count,
                 ping_success_count, ping_timeout_count,

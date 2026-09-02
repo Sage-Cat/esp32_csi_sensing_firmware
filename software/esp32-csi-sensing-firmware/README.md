@@ -27,6 +27,8 @@ extensions:
 - bounded `cws-firmware-control/1` prepare/apply/query/restore control with
   boot/config epochs and idempotent command correlation;
 - serialized CSI and heartbeat output for lossless chunk capture.
+- probe receive timeouts bounded to one configured sampling interval, so one
+  lost echo reply cannot pause a 40 Hz stream for the SDK's one-second default;
 
 The initial hardware target is ESP32-S3 revision 0.2 with 16 MB flash and 8 MB
 PSRAM. Builds are pinned to ESP-IDF v5.5.4.
@@ -94,7 +96,7 @@ Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same serial channel. Zero
 stops the generating ping session without disabling Wi-Fi or changing the
 production network. Success emits `CWS_CONFIG_APPLIED ping_hz=20`; invalid or
 failed requests retain the previous rate and emit `CWS_CONFIG_REJECTED`.
-S3 version 1.4.7 and C5 version 1.0.7 keep the command-input task alive when
+S3 version 1.4.8 and C5 version 1.0.8 keep the command-input task alive when
 their serial transport temporarily reports EOF before the collector opens the
 port, so both the legacy command and `cws-firmware-control/1` remain reachable
 after unattended boot. S3 uses the interrupt-driven USB Serial/JTAG driver;
@@ -114,8 +116,10 @@ record.
 `CWS_REBOOT` emits an acknowledgement before a deliberate software reset, which
 provides a reproducible fault injection without touching the board or cable.
 Every heartbeat also reports CSI/probe reinitialization and failure counters,
-CSI callback/filter diagnostics, ping success/timeout counters, and a bounded
-CSI-stalled flag/counter.
+CSI callback/filter diagnostics, ping success/timeout counters, the effective
+`ping_timeout_ms`, and a bounded CSI-stalled flag/counter. The receive timeout
+equals one nominal probe interval (25 ms at 40 Hz), replacing the SDK's
+one-second default that otherwise serializes a lost reply with the next probe.
 Association always reapplies the CSI callback/configuration; three consecutive
 connected heartbeats without CSI progress mark the capture stalled once; the
 watchdog does not restart CSI, ping, or Wi-Fi during a long-running operation. The
