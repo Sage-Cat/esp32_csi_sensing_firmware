@@ -50,9 +50,11 @@
 #if CONFIG_IDF_TARGET_ESP32C5
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-c5-v1"
 #define CWS_FIRMWARE_VERSION "1.0.8"
+#define CWS_PING_TASK_STACK_BYTES 3072
 #else
 #define CWS_FIRMWARE_PROFILE "cooperative-router-csi-s3-v1"
-#define CWS_FIRMWARE_VERSION "1.4.8"
+#define CWS_FIRMWARE_VERSION "1.4.9"
+#define CWS_PING_TASK_STACK_BYTES 6144
 #endif
 
 #define CWS_COMMAND_TASK_STACK_BYTES 12288
@@ -456,7 +458,7 @@ static esp_err_t ping_router_start(uint32_t frequency_hz,
                                         &config.timeout_ms)) {
         return ESP_ERR_INVALID_ARG;
     }
-    config.task_stack_size = 3072;
+    config.task_stack_size = CWS_PING_TASK_STACK_BYTES;
     config.data_size = CONFIG_CWS_PROBE_PAYLOAD_BYTES;
     config.target_addr.u_addr.ip4.addr = ip4_addr_get_u32(&local_ip.gw);
     config.target_addr.type = ESP_IPADDR_TYPE_V4;

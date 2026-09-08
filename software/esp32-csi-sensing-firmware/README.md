@@ -96,7 +96,7 @@ Version 1.4.1 accepts `CWS_SET_PING_HZ 20` on the same serial channel. Zero
 stops the generating ping session without disabling Wi-Fi or changing the
 production network. Success emits `CWS_CONFIG_APPLIED ping_hz=20`; invalid or
 failed requests retain the previous rate and emit `CWS_CONFIG_REJECTED`.
-S3 version 1.4.8 and C5 version 1.0.8 keep the command-input task alive when
+S3 version 1.4.9 and C5 version 1.0.8 keep the command-input task alive when
 their serial transport temporarily reports EOF before the collector opens the
 port, so both the legacy command and `cws-firmware-control/1` remain reachable
 after unattended boot. S3 uses the interrupt-driven USB Serial/JTAG driver;
@@ -106,7 +106,10 @@ ending, allowing commands and acknowledgements to coexist with sustained CSI
 output. The command task has a dedicated 12 KiB stack for the nested
 prepare/apply/query/restore path and ping-session reconfiguration. Profile,
 schema, and heartbeat records are formatted before taking the CSI-output mutex
-and emitted through one bulk transport-driver write. CSI records use the same
+and emitted through one bulk transport-driver write. The S3 ping task uses a
+6 KiB stack so sustained socket-error reporting under loaded 40 Hz operation
+cannot exhaust the task stack; the C5 profile retains its qualified 3 KiB
+allocation. CSI records use the same
 bulk driver path, avoiding the VFS character-at-a-time write adapter and
 preventing telemetry formatting or transmission from holding the mutex across
 the next CSI callback. A CSI callback may wait at most 10 ms for that shared
