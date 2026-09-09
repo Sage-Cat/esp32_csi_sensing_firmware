@@ -8,6 +8,9 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Local task worktrees.
+/wt/
+
 # Local deployment credentials and identifiers.
 secrets/
 credentials/
